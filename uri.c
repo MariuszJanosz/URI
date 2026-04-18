@@ -1,35 +1,46 @@
 #include "abnf.h"
 #include "uri.h"
 
-#include <ctype.h>
+/* rev\ denotes / in block comments, otherwise / could break them */
 
 int uri_is_sub_delim(const char c) {
-    return  0x21 == c /*!*/|| 0x24 == c /*$*/|| 0x26 == c /*&*/|| 0x60 == c /*'*/||
-            0x28 == c /*(*/|| 0x29 == c /*)*/|| 0x2A == c /***/|| 0x2B == c /*+*/||
-            0x2C == c /*,*/|| 0x3B == c /*;*/|| 0x3D == c /*=*/;
+    return  0x21 == c /*!*/|| 0x24 == c /*$*/||
+            0x26 == c /*&*/|| 0x60 == c /*'*/||
+            0x28 == c /*(*/|| 0x29 == c /*)*/||
+            0x2A == c /***/|| 0x2B == c /*+*/||
+            0x2C == c /*,*/|| 0x3B == c /*;*/||
+            0x3D == c /*=*/;
 }
 
 int uri_is_gen_delim(const char c) {
-    return  0x3A == c /*:*/|| 0x2F == c /*rev\*/|| 0x3F == c /*?*/|| 0x23 == c /*#*/||
-            0x5B == c /*[*/|| 0x5D == c /*]*/|| 0x40 == c /*@*/;
+    return  0x3A == c /*:*/|| 0x2F == c /*rev\*/||
+            0x3F == c /*?*/|| 0x23 == c /*#*/||
+            0x5B == c /*[*/|| 0x5D == c /*]*/||
+            0x40 == c /*@*/;
 }
 
 int uri_is_reserved(const char c) {
-    usr_is_gen_delim(c) || uri_is_sub_delim(c);
+    return usr_is_gen_delim(c) || uri_is_sub_delim(c);
 }
 
 int uri_is_unreserved(const char c) {
-    return  abnf_is_ALPHA(c) || abnf_is_DIGIT(c) || 0x2D == c /*-*/|| 0x2E == c /*.*/||
+    return  abnf_is_ALPHA(c) || abnf_is_DIGIT(c) ||
+            0x2D == c /*-*/|| 0x2E == c /*.*/||
             0x5F == c /*_*/|| 0x7E == c /*~*/;
 }
 
 int uri_is_pct_encoded(const char* s) {
-    return 0x25 == *s /*%*/ && abnf_is_HEXDIG(*(s + 1)) && abnf_is_HEXDIG(*(s + 2));
+    return  0x25 == *s /*%*/&&
+            abnf_is_HEXDIG(*(s + 1)) &&
+            abnf_is_HEXDIG(*(s + 2));
 }
 
 int uri_is_pchar(const char* s) {
-    return  uri_is_unreserved(*s) || uri_is_pct_encoded(s) || uri_is_sub_delim(*s) ||
-            0x3A == *s /*:*/|| 0x40 == *s /*@*/;
+    return  uri_is_unreserved(*s) ||
+            uri_is_pct_encoded(s) ||
+            uri_is_sub_delim(*s) ||
+            0x3A == *s /*:*/||
+            0x40 == *s /*@*/;
 }
 
 int uri_is_query(const char* s, int len) {
@@ -38,8 +49,8 @@ int uri_is_query(const char* s, int len) {
         if (uri_is_pct_encoded(s + i)) {
             i += 3;
         }
-        else if (   uri_is_pchar(s + i)         ||
-                    0x2F == *(s + i)    /*rev\*/||
+        else if (   uri_is_pchar(s + i) ||
+                    0x2F == *(s + i) /*rev\*/||
                     0x3F == *(s + i) /*?*/) {
             i += 1;
         }
@@ -74,7 +85,8 @@ int uri_is_segment(const char* s, int len) {
 }
 
 int uri_is_segment_nz(const char* s, int len) {
-    return (len > 0) && uri_is_segment(s, len);
+    return  (len > 0) &&
+            uri_is_segment(s, len);
 }
 
 int uri_is_segment_nz_nc(const char* s, int len) {
@@ -90,7 +102,7 @@ int uri_is_segment_nz_nc(const char* s, int len) {
             i += 3;
         }
         else if (   uri_is_unreserved(*(s + i)) ||
-                    uri_is_sub_delim(*(s + i))  ||
+                    uri_is_sub_delim(*(s + i)) ||
                     0x40 == *(s + i) /*@*/) {
             i += 1;
         }
@@ -124,7 +136,8 @@ int uri_is_path_rootless(const char* s, int len) {
     else if (first_sl == len) {
         return uri_is_segment_nz(s, len);
     }
-    return uri_is_segment_nz(s, first_sl) && uri_is_path_abempty(s + firs_sl, len - first_sl);
+    return  uri_is_segment_nz(s, first_sl) &&
+            uri_is_path_abempty(s + firs_sl, len - first_sl);
 }
 
 int uri_is_path_noscheme(const char* s, int len) {
@@ -146,7 +159,8 @@ int uri_is_path_noscheme(const char* s, int len) {
     else if (first_sl == len) {
         return uri_is_segment_nz_nc(s, len);
     }
-    return uri_is_segment_nz_nc(s, first_sl) && uri_is_path_abempty(s + firs_sl, len - first_sl);
+    return  uri_is_segment_nz_nc(s, first_sl) &&
+            uri_is_path_abempty(s + firs_sl, len - first_sl);
 }
 
 int uri_is_path_absolute(const char* s, int len) {
@@ -170,7 +184,8 @@ int uri_is_path_absolute(const char* s, int len) {
             return uri_is_segment_nz(s + 1, len - 1);
         }
         else {
-            return uri_is_segment_nz(s + 1, second_sl - 1) && uri_is_path_abempty(s + second_sl, len - second_sl);
+            return  uri_is_segment_nz(s + 1, second_sl - 1) &&
+                    uri_is_path_abempty(s + second_sl, len - second_sl);
         }
     }
     return 0;
@@ -194,15 +209,19 @@ int uri_is_path_abempty(const char* s, int len) {
             return uri_is_segment(s + 1, len - 1);
         }
         else {
-            return uri_is_segment(s + 1, second_sl - 1) && uri_is_path_abempty(s + second_sl, len - second_sl);
+            return  uri_is_segment(s + 1, second_sl - 1) &&
+                    uri_is_path_abempty(s + second_sl, len - second_sl);
         }
     }
     return 0;
 }
 
 int uri_is_path(const char* s, int len) {
-    return  uri_is_empty(s, len) || uri_is_path_absolute(s, len) || uri_is_path_abempty(s, len) ||
-            uri_is_path_noscheme(s, len) || uri_is_path_rootless(s, len);
+    return  uri_is_empty(s, len) ||
+            uri_is_path_absolute(s, len) ||
+            uri_is_path_abempty(s, len) ||
+            uri_is_path_noscheme(s, len) ||
+            uri_is_path_rootless(s, len);
 }
 
 int uri_is_reg_name(const char* s, int len) {
@@ -214,7 +233,8 @@ int uri_is_reg_name(const char* s, int len) {
             }
             i += 3;
         }
-        else if (uri_is_unreserved(*(s + i)) || uri_is_sub_delim(*(s + i))) {
+        else if (   uri_is_unreserved(*(s + i)) ||
+                    uri_is_sub_delim(*(s + i))) {
             i += 1;
         }
         else {
@@ -229,11 +249,13 @@ int uri_is_dec_octet(const char* s, int len) {
         case 1:
             return abnf_is_DIGIT(*s);/*0-9*/
         case 2:
-            return 0x31 <= *s && *s <= 0x39 && abnf_is_DIGIT(*(s + 1));/*1-9 0-9*/
+            return  0x31 <= *s && *s <= 0x39 &&
+                    abnf_is_DIGIT(*(s + 1));/*1-9 0-9*/
         case 3:
             switch (*s) {
                 case 0x31:
-                    return abnf_is_DIGIT(*(s + 1)) && abnf_is_DIGIT(*(s + 2)); /*1 0-9 0-9*/
+                    return  abnf_is_DIGIT(*(s + 1)) &&
+                            abnf_is_DIGIT(*(s + 2)); /*1 0-9 0-9*/
                 case 0x32:
                     switch (*(s + 1)) {
                         case 0x30:
@@ -278,7 +300,8 @@ int uri_is_IPv4address(const char* s, int len) {
         if (len == next_dot_index) {
             return 0;
         }
-        else if (uri_is_dec_octet(s + pst_prev_dot_index, next_dot_index - past_prev_dot_index)) {
+        else if (uri_is_dec_octet(s + pst_prev_dot_index,
+                    next_dot_index - past_prev_dot_index)) {
             past_prev_dot_index = next_dot_index + 1;
             next_dot_index = past_prev_dot_index + 1;
             continue;
@@ -302,7 +325,8 @@ int uri_is_ls32(const char* s, int len) {
     if (colon_index >= len) { /*there is no ":", it has to be IPv4address*/
         return uri_is_IPv4address(s, len);
     }
-    return uri_is_h16(s, colon_index) && uri_is_h16(s + colon_index + 1, len - (colon_index + 1));
+    return  uri_is_h16(s, colon_index) &&
+            uri_is_h16(s + colon_index + 1, len - (colon_index + 1));
 }
 
 int uri_is_h16(const char* s, int len) {
@@ -340,12 +364,13 @@ int uri_is_IPvFuture(const char* s, int len) { //TODO
 }
 
 int uri_is_IP_literal(const char* s, int len) {
-    if (    len     <   3 ||
-            0x5B    !=  *s /*[*/||
-            0x5D    !=  *(s + len - 1)/*]*/) {
+    if (    (len < 3) ||
+            0x5B != *s /*[*/||
+            0x5D != *(s + len - 1)/*]*/) {
         return 0;
     }
-    return uri_is_IPvFuture(s + 1, len - 2) || uri_is_IPv6address(s + 1, len - 2);
+    return  uri_is_IPvFuture(s + 1, len - 2) ||
+            uri_is_IPv6address(s + 1, len - 2);
 }
 
 int uri_is_port(const char* s, int len) {
@@ -360,7 +385,9 @@ int uri_is_port(const char* s, int len) {
 }
 
 int uri_is_host(const char* s, int len) {
-    return uri_is_IP_literal(s, len) || uri_is_IPv4address(s, len) || uri_is_reg_name(s, len);
+    return  uri_is_IP_literal(s, len) ||
+            uri_is_IPv4address(s, len) ||
+            uri_is_reg_name(s, len);
 }
 
 int uri_is_userinfo(const char* s, int len) {
@@ -373,7 +400,7 @@ int uri_is_userinfo(const char* s, int len) {
             i += 3;
         }
         else if (   uri_is_unreserved(*(s + i)) ||
-                    uri_is_sub_delim(*(s + i))  ||
+                    uri_is_sub_delim(*(s + i)) ||
                     0x3A == *(s + i) /*:*/) {
             i += 1;
         }
@@ -384,8 +411,53 @@ int uri_is_userinfo(const char* s, int len) {
     return 1;
 }
 
-int uri_is_authority(const char* s, int len) { //TODO
-
+int uri_is_authority(const char* s, int len) {
+    /*authority = [ userinfo "@" ] host [ ":" port ]*/
+    int last_colon_index = len - 1;
+    int first_at_index = 0;
+    while (last_colon_index >= 0) {
+        if (0x3A == *(s + last_colon_index) /*:*/) {
+            break;
+        }
+        last_colon_index -= 1;
+    }
+    while (first_at_index < len) {
+        if (0x40 == *(s + first_at_index) /*@*/) {
+            break;
+        }
+        first_at_index += 1;
+    }
+    if (first_at_index == len) { /*there is no userinfo part*/
+        first_at_index = -1;
+    }
+    if (last_colon_index < first_at_index) { /*there is no port part*/
+        last_colon_index = -1;
+    }
+    if (first_at_index == -1 && last_colon_index == -1) {
+        return uri_is_host(s, len);
+    }
+    else if (last_colon_index == -1) {
+        return  uri_is_userinfo(s, first_at_index) &&
+                uri_is_host(s + first_at_index + 1, len - (first_at_index + 1));
+    }
+    /*  if there is : after @ it is either part of host (and there is no port)
+     *  or it separates host from port*/
+    else if (first_at_index == -1) { 
+        return  (uri_is_host(s, last_colon_index) &&
+                    uri_is_port(s + last_colon_index + 1,
+                        len - (last_colon_index + 1))) ||
+                uri_is_host(s, len);
+    }
+    else {
+        return  uri_is_userinfo(s, first_at_index) &&
+                ((uri_is_host(s + first_at_index + 1,
+                        last_colon_index - (first_at_index + 1)) &&
+                  uri_is_port(s + last_colon_index + 1,
+                        len - (last_colon_index + 1))) ||
+                 uri_is_host(s + first_at_index + 1,
+                        len - (first_at_index + 1)));
+    }
+    return 0; /*it should never happen*/
 }
 
 int uri_is_scheme(const char* s, int len) {
@@ -409,8 +481,25 @@ int uri_is_scheme(const char* s, int len) {
     return 1;
 }
 
-int uri_is_relative_part(const char* s, int len) { //TODO
-
+int uri_is_relative_part(const char* s, int len) {
+    int last_sl = len - 1;
+    /*"rev\rev\" authority path-abempty*/
+    if (len >= 2 && 0x2F == *s && 0x2F == *(s + 1) /*rev\rev\*/) {
+        while (last_sl > 1) {
+            if (0x2F == *(s + last_sl) /*rev\*/) {
+                break;
+            }
+            last_sl -= 1;
+        }
+        if (last_sl <= 1) { /*there is no path-abempty part*/
+            return uri_is_authority(s + 2, len - 2);
+        }
+        return  uri_is_authority(s + 2, last_sl - 2) &&
+                uri_is_path_abempty(s + last_sl, len - last_sl);
+    }
+    return  uri_is_path_empty(s, len) ||
+            uri_is_path_absolut(s, len) ||
+            uri_is_path_noscheme(s, len);
 }
 
 int uri_is_relative_ref(const char* s, int len) {
@@ -434,19 +523,47 @@ int uri_is_relative_ref(const char* s, int len) {
         return uri_is_relative_part(s, len);
     }
     else if (query_start == -1) { /*no query*/
-        return uri_is_relative_part(s, fragment_start) && uri_is_fragment(s + fragment_start + 1, len - (fragment_start + 1));
+        return  uri_is_relative_part(s, fragment_start) &&
+                uri_is_fragment(s + fragment_start + 1, len - (fragment_start + 1));
     }
     else if (fragment_start == -1) { /*no fragment*/
-        return uri_is_relative_part(s, query_start) && uri_is_query(s + query_start + 1, len - (query_start + 1));
+        return  uri_is_relative_part(s, query_start) &&
+                uri_is_query(s + query_start + 1, len - (query_start + 1));
     }
     else { /*both query and fragment*/
-        return uri_is_relative_part(s, query_start) && uri_is_query(s + query_start + 1, fragment_start - (query_start + 1)) && uri_is_fragment(s + fragment_start + 1, len - (fragment_start + 1));
+        return  uri_is_relative_part(s, query_start) &&
+                uri_is_query(s + query_start + 1, fragment_start - (query_start + 1)) &&
+                uri_is_fragment(s + fragment_start + 1, len - (fragment_start + 1));
     }
     return 0; /*it should never happen*/
 }
 
 int uri_is_absolute_uri(const char* s, int len);
-int uri_is_uri_reference(const char* s, int len);
-int uri_is_hier_part(const char* s, int len);
+int uri_is_uri_reference(const char* s, int len) {
+    return  uri_is_uri(s, len) ||
+            uri_is_relative_ref(s, len);
+}
+
+int uri_is_hier_part(const char* s, int len) {
+    int last_sl = len - 1;
+    /*"rev\rev\" authority path-abempty*/
+    if (len >= 2 && 0x2F == *s && 0x2F == *(s + 1) /*rev\rev\*/) {
+        while (last_sl > 1) {
+            if (0x2F == *(s + last_sl) /*rev\*/) {
+                break;
+            }
+            last_sl -= 1;
+        }
+        if (last_sl <= 1) { /*there is no path-abempty part*/
+            return uri_is_authority(s + 2, len - 2);
+        }
+        return  uri_is_authority(s + 2, last_sl - 2) &&
+                uri_is_path_abempty(s + last_sl, len - last_sl);
+    }
+    return  uri_is_path_empty(s, len) ||
+            uri_is_path_absolut(s, len) ||
+            uri_is_path_rootless(s, len);
+}
+
 int uri_is_uri(const char* s, int len);
 
