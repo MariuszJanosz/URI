@@ -20,7 +20,7 @@ int uri_is_gen_delim(const char c) {
 }
 
 int uri_is_reserved(const char c) {
-    return usr_is_gen_delim(c) || uri_is_sub_delim(c);
+    return uri_is_gen_delim(c) || uri_is_sub_delim(c);
 }
 
 int uri_is_unreserved(const char c) {
@@ -62,7 +62,7 @@ int uri_is_query(const char* s, int len) {
 }
 
 int uri_is_fragment(const char* s, int len) {
-    return uri_is_query(s);
+    return uri_is_query(s, len);
 }
 
 int uri_is_segment(const char* s, int len) {
@@ -137,7 +137,7 @@ int uri_is_path_rootless(const char* s, int len) {
         return uri_is_segment_nz(s, len);
     }
     return  uri_is_segment_nz(s, first_sl) &&
-            uri_is_path_abempty(s + firs_sl, len - first_sl);
+            uri_is_path_abempty(s + first_sl, len - first_sl);
 }
 
 int uri_is_path_noscheme(const char* s, int len) {
@@ -160,7 +160,7 @@ int uri_is_path_noscheme(const char* s, int len) {
         return uri_is_segment_nz_nc(s, len);
     }
     return  uri_is_segment_nz_nc(s, first_sl) &&
-            uri_is_path_abempty(s + firs_sl, len - first_sl);
+            uri_is_path_abempty(s + first_sl, len - first_sl);
 }
 
 int uri_is_path_absolute(const char* s, int len) {
@@ -217,7 +217,7 @@ int uri_is_path_abempty(const char* s, int len) {
 }
 
 int uri_is_path(const char* s, int len) {
-    return  uri_is_empty(s, len) ||
+    return  uri_is_path_empty(s, len) ||
             uri_is_path_absolute(s, len) ||
             uri_is_path_abempty(s, len) ||
             uri_is_path_noscheme(s, len) ||
@@ -300,7 +300,7 @@ int uri_is_IPv4address(const char* s, int len) {
         if (len == next_dot_index) {
             return 0;
         }
-        else if (uri_is_dec_octet(s + pst_prev_dot_index,
+        else if (uri_is_dec_octet(s + past_prev_dot_index,
                     next_dot_index - past_prev_dot_index)) {
             past_prev_dot_index = next_dot_index + 1;
             next_dot_index = past_prev_dot_index + 1;
@@ -567,7 +567,7 @@ int uri_is_scheme(const char* s, int len) {
     }
     while (i < len) {
         if (!(abnf_is_ALPHA(*(s + i)) ||
-              snbf_is_DIGIT(*(s + i)) ||
+              abnf_is_DIGIT(*(s + i)) ||
               0x2B == *(s + i) /*+*/||
               0x2D == *(s + i) /*-*/||
               0x2E == *(s + i) /*.*/)) {
@@ -595,7 +595,7 @@ int uri_is_relative_part(const char* s, int len) {
                 uri_is_path_abempty(s + last_sl, len - last_sl);
     }
     return  uri_is_path_empty(s, len) ||
-            uri_is_path_absolut(s, len) ||
+            uri_is_path_absolute(s, len) ||
             uri_is_path_noscheme(s, len);
 }
 
@@ -689,7 +689,7 @@ int uri_is_hier_part(const char* s, int len) {
                 uri_is_path_abempty(s + last_sl, len - last_sl);
     }
     return  uri_is_path_empty(s, len) ||
-            uri_is_path_absolut(s, len) ||
+            uri_is_path_absolute(s, len) ||
             uri_is_path_rootless(s, len);
 }
 
