@@ -1,7 +1,7 @@
 #include "abnf.h"
 #include "uri.h"
 
-/* rev\ denotes / in block comments, otherwise / could break them */
+/* rev\ denotes / in block comments, otherwise / might break them */
 
 int uri_is_sub_delim(const char c) {
     return  0x21 == c /*!*/|| 0x24 == c /*$*/||
@@ -344,23 +344,120 @@ int uri_is_h16(const char* s, int len) {
     return 1;
 }
 
-int uri_is_IPv6address(const char* s, int len) { //TODO
-    int double_colon_index = 0;
-    int has_dots = 0;
-    while (dounle_colon_index + 1 < len) {
-        if (    0x3A == *(s + double_colon_index) &&
-                0x3A == *(s + double_colon_index + 1) /*::*/) {
-            break;
+int uri_is_IPv6address(const char* s, int len) {
+    int past_prev_colon = 0;
+    int next_colon = -1;
+    int h16_count = 0;
+    int has_double_colon = 0;
+    int i = 0;
+    if (len < 2) {
+        return 0;
+    }
+    /*if it starts with ::*/
+    if (0x3A == *s && 0x3A == *(s + 1) /*::*/) {
+        has_double_colon = 1;
+        past_prev_colon = 2;
+        i = 2;
+    }
+    while (i < len) {
+        /*next : found*/
+        if (0x3A == *(s + i) /*:*/) {
+            next_colon = i;
+            if (uri_is_h16(s + past_prev_colon,
+                        next_colon - past_prev_colon)) {
+                h16_count += 1;
+                if (    next_colon + 1 < len &&
+                        0x3A == *(s + next_colon + 1) /*:*/) {
+                    if (has_double_colon) {
+                        return 0; /*only one :: allowed*/
+                    }
+                    has_double_colon = 1;
+                    past_prev_colon = next_colon + 2;
+                    i += 2;
+                    continue;
+                }
+                past_prev_colon = next_colon + 1;
+                i += 1;
+                continue;
+            }
+            return 0; /*it wasn't h16*/
         }
-        double_colon_index += 1;
+        /*first . found*/
+        if (0x2E == *(s + i) /*.*/) {
+            if (uri_is_IPv4address(s + past_prev_colon, len - past_prev_colon)) {
+                h16_count += 2;
+                break;
+            }
+            else {
+                return 0;
+            }
+        }
+        if (!abnf_is_HEXDIG(*(s + i))) {
+            return 0;
+        }
+        else {
+            i += 1;
+        }
     }
-    if (double_colon_index + 1 >= len) { /*6( h16 ":" ) ls32*/
-        
+    /*i < len, so we exited loop by break, so there is IPv4 tail*/
+    if (i < len) {
+        if (has_double_colon) {
+            return h16_count <= 8;
+        }
+        return h16_count == 8;
     }
+    /*ther should be additional trailing h16 or the entire string is "::"*/
+    else {
+        if (has_double_colon && (2 == len)) {
+            return 1;
+        }
+        else if (uri_is_h16(s + past_prev_colon, len - past_prev_colon)) {
+            h16_count += 1;
+        }
+        else {
+            return 0;
+        }
+        if (has_double_colon) {
+            return h16_count <= 8;
+        }
+        return h16_count == 8;
+    }
+    return 0; /*it should never happen*/
 }
 
-int uri_is_IPvFuture(const char* s, int len) { //TODO
-
+int uri_is_IPvFuture(const char* s, int len) {
+    int i = 0;
+    if (len < 4) {
+        return 0;
+    }
+    if (!abnf_is_V(*(s + i))) { /*should start with "v"*/
+        return 0;
+    }
+    i += 1;
+    while (i < len && abnf_is_HEXDIG(*(s + i))) {
+        i += 1;
+    }
+    if ((1 == i) || (len == i)) { /*should have at leas one HEXDIG*/
+        return 0;
+    }
+    if (0x2E != *(s + i) /*.*/) { /*should be .*/
+        return 0;
+    }
+    i += 1;
+    if (i == len) { /*should have at leas one more character*/
+        return 0;
+    }
+    while (i < len) { /*from now till end ( unreserved / sub-delims / ":" )*/
+        if (    uri_is_unreserved(*(s + i)) ||
+                uri_is_sub_delim(*(s + i)) ||
+                0x3A == *(s + i) /*:*/) {
+            i += 1;
+        }
+        else {
+            return 0;
+        }
+    }
+    return 1;
 }
 
 int uri_is_IP_literal(const char* s, int len) {
@@ -376,7 +473,7 @@ int uri_is_IP_literal(const char* s, int len) {
 int uri_is_port(const char* s, int len) {
     int i = 0;
     while (i < len) {
-        if (!anbf_is_DIGIT(*(s + i))) {
+        if (!abnf_is_DIGIT(*(s + i))) {
             return 0;
         }
         i += 1;
@@ -465,11 +562,11 @@ int uri_is_scheme(const char* s, int len) {
     if (len < 1) {
         return 0;
     }
-    if (!anbf_is_ALPHA(*s)) {
+    if (!abnf_is_ALPHA(*s)) {
         return 0;
     }
     while (i < len) {
-        if (!(anbf_is_ALPHA(*(s + i)) ||
+        if (!(abnf_is_ALPHA(*(s + i)) ||
               snbf_is_DIGIT(*(s + i)) ||
               0x2B == *(s + i) /*+*/||
               0x2D == *(s + i) /*-*/||
@@ -538,7 +635,38 @@ int uri_is_relative_ref(const char* s, int len) {
     return 0; /*it should never happen*/
 }
 
-int uri_is_absolute_uri(const char* s, int len);
+int uri_is_absolute_uri(const char* s, int len) {
+    /*absolute-URI = scheme ":" hier-part [ "?" query ]*/
+    int i = 0;
+    int hier_part_start = -1;
+    while (i < len) {
+        if (0x3A == *(s + i) /*:*/) {
+            break;
+        }
+        i += 1;
+    }
+    if (i == len) { /*There is no :*/
+        return 0;
+    }
+    if (!uri_is_scheme(s, i)) { /*scheme should be befre first :*/
+        return 0;
+    }
+    i += 1;
+    hier_part_start = i;
+    while (i < len) {
+        if (0x3F == *(s + i) /*?*/) {
+            break;
+        }
+        i += 1;
+    }
+    if (i == len) { /*There is no ( "?" query )*/
+        return uri_is_hier_part(s + hier_part_start, len - hier_part_start);
+    }
+    /*There are both hier-part and ( "?" query )*/
+    return  uri_is_hier_part(s + hier_part_start, i - hier_part_start) &&
+            uri_is_query(s + i + 1, len - (i + 1));
+}
+
 int uri_is_uri_reference(const char* s, int len) {
     return  uri_is_uri(s, len) ||
             uri_is_relative_ref(s, len);
@@ -565,5 +693,53 @@ int uri_is_hier_part(const char* s, int len) {
             uri_is_path_rootless(s, len);
 }
 
-int uri_is_uri(const char* s, int len);
+int uri_is_uri(const char* s, int len) {
+    /*URI = scheme ":" hier-part [ "?" query ] [ "#" fragment ]*/
+    int i = 0;
+    int hier_part_start = -1;
+    int query_start = -1;
+    while (i < len) {
+        if (0x3A == *(s + i) /*:*/) {
+            break;
+        }
+        i += 1;
+    }
+    if (i == len) { /*There is no :*/
+        return 0;
+    }
+    if (!uri_is_scheme(s, i)) { /*scheme should be befre first :*/
+        return 0;
+    }
+    i += 1;
+    hier_part_start = i;
+    while (i < len) {
+        if (    0x3F == *(s + i) /*?*/||
+                0x23 == *(s + i) /*#*/) {
+            break;
+        }
+        i += 1;
+    }
+    if (i == len) { /*There is no ( "?" query ) or ( "#" fragment )*/
+        return uri_is_hier_part(s + hier_part_start, len - hier_part_start);
+    }
+    if (0x3F == *(s + i) /*?*/) {
+        if (!uri_is_hier_part(s + hier_part_start, i - hier_part_start)) {
+            return 0;
+        }
+        i += 1;
+        query_start = i; /*if we've found ? before # there should be query*/
+    }
+    while (i < len) {
+        if (0x23 == *(s + i) /*#*/) {
+            break;
+        }
+        i += 1;
+    }
+    if (i == len) { /*there is no fragment*/
+        return uri_is_query(s + query_start, len - query_start);
+    }
+    /*there should be query "#" fragment*/
+    return  uri_is_query(s + query_start, i - query_start) &&
+            uri_is_fragment(s + i + 1, len - (i + 1));
+}
 
