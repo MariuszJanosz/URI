@@ -64,7 +64,7 @@ UriParsingStatus parse_URI(const char* cstr, URI* res) {
         }
         //determin borders based on found delimeters
         if (last_at != -1) {
-            res->userinfo.cstr = res->scheme.cstr;
+            res->userinfo.cstr = res->host.cstr;
             res->userinfo.len = last_at - (res->userinfo.cstr - cstr);
             res->host.cstr = cstr + last_at + 1;
         }
@@ -115,16 +115,24 @@ void print_StringView(StringView sv) {
 }
 
 int main() {
-    const char* cstr = "http://www.example.com:80/a/b/c/d/index.html?rwf=22#end_end";
-    URI uri;
-    if (parse_URI(cstr, &uri) == URI_PARSING_FAIL) exit(1);
-    print_StringView(uri.scheme);
-    print_StringView(uri.userinfo);
-    print_StringView(uri.host);
-    print_StringView(uri.port);
-    print_StringView(uri.path);
-    print_StringView(uri.query);
-    print_StringView(uri.fragment);
+    const char* strings[] =
+        {   "http://www.example.com:80/a/b/c/d/index.html?rwf=22#end_end",
+            "https:/",
+            "file:///home/user/file.txt",
+            "https://blah@www.exmple.com:443/ewgrw/bewg/index.html?q=64;rhef#test"
+        };
+    for (int i = 0; i < sizeof(strings) / sizeof(strings[0]); ++i) {
+        const char* cstr = strings[i];
+        URI uri;
+        if (parse_URI(cstr, &uri) == URI_PARSING_FAIL) exit(1);
+        printf("scheme: "); print_StringView(uri.scheme);
+        printf("userinfo: "); print_StringView(uri.userinfo);
+        printf("host: "); print_StringView(uri.host);
+        printf("port: "); print_StringView(uri.port);
+        printf("path: "); print_StringView(uri.path);
+        printf("query: "); print_StringView(uri.query);
+        printf("fragment: "); print_StringView(uri.fragment);
+    }
     return 0;
 }
 
