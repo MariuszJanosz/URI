@@ -1,34 +1,8 @@
 #include "uri.h"
+#include "uri_parser.h"
 
-#include <stdio.h>
-#include <stddef.h>
 #include <string.h>
-#include <stdlib.h>
-
-typedef struct StringView {
-    const char* cstr;
-    size_t len;
-} StringView;
-
-typedef struct URI {
-    StringView scheme;
-    StringView userinfo;
-    StringView host;
-    StringView port;
-    StringView path;
-    StringView query;
-    StringView fragment;
-} URI;
-
-typedef enum UriParsingStatus {
-    URI_PARSING_SUCCESS,
-    URI_PARSING_FAIL
-} UriParsingStatus;
-
-StringView cstr_to_StringView(const char* cstr) {
-    if (!cstr) return (StringView){NULL, 0};
-    return (StringView){cstr, strlen(cstr)};
-}
+#include <sys/types.h>
 
 UriParsingStatus parse_URI(const char* cstr, URI* res) {
     if (!cstr) return URI_PARSING_FAIL;
@@ -104,7 +78,16 @@ UriParsingStatus parse_URI(const char* cstr, URI* res) {
     if (!uri_is_userinfo(res->userinfo.cstr, res->userinfo.len)) return URI_PARSING_FAIL;
     if (!uri_is_host(res->host.cstr, res->host.len)) return URI_PARSING_FAIL;
     if (!uri_is_port(res->port.cstr, res->port.len)) return URI_PARSING_FAIL;
-    if (!uri_is_path(res->path.cstr, res->path.len)) return URI_PARSING_FAIL;
+    if (has_authority) {
+        if (!uri_is_path_abempty(res->path.cstr, res->path.len))
+            return URI_PARSING_FAIL;
+    }
+    else {
+        if (    !uri_is_path_absolute(res->path.cstr, res->path.len) &&
+                !uri_is_path_rootless(res->path.cstr, res->path.len) &&
+                !uri_is_path_empty(res->path.cstr, res->path.len))
+            return URI_PARSING_FAIL;
+    }
     if (!uri_is_query(res->query.cstr, res->query.len)) return URI_PARSING_FAIL;
     if (!uri_is_fragment(res->fragment.cstr, res->fragment.len)) return URI_PARSING_FAIL;
     return URI_PARSING_SUCCESS;
@@ -177,54 +160,18 @@ UriParsingStatus parse_relative_ref(const char* cstr, URI* res) {
     if (!uri_is_userinfo(res->userinfo.cstr, res->userinfo.len)) return URI_PARSING_FAIL;
     if (!uri_is_host(res->host.cstr, res->host.len)) return URI_PARSING_FAIL;
     if (!uri_is_port(res->port.cstr, res->port.len)) return URI_PARSING_FAIL;
-    if (!uri_is_path(res->path.cstr, res->path.len)) return URI_PARSING_FAIL;
+    if (has_authority) {
+        if (!uri_is_path_abempty(res->path.cstr, res->path.len))
+            return URI_PARSING_FAIL;
+    }
+    else {
+        if (    !uri_is_path_absolute(res->path.cstr, res->path.len) &&
+                !uri_is_path_noscheme(res->path.cstr, res->path.len) &&
+                !uri_is_path_empty(res->path.cstr, res->path.len))
+            return URI_PARSING_FAIL;
+    }
     if (!uri_is_query(res->query.cstr, res->query.len)) return URI_PARSING_FAIL;
     if (!uri_is_fragment(res->fragment.cstr, res->fragment.len)) return URI_PARSING_FAIL;
     return URI_PARSING_SUCCESS;
-}
-
-void print_StringView(StringView sv) {
-    printf("%.*s\n", (int)sv.len, sv.cstr);
-}
-
-int main() {
-    const char* uri_strings[] =
-        {   "http://www.example.com:80/a/b/c/d/index.html?rwf=22#end_end",
-            "https:/",
-            "file:///home/user/file.txt",
-            "https://blah@www.exmple.com:443/ewgrw/bewg/index.html?q=64;rhef#test"
-        };
-    for (int i = 0; i < sizeof(uri_strings) / sizeof(uri_strings[0]); ++i) {
-        const char* cstr = uri_strings[i];
-        URI uri;
-        if (parse_URI(cstr, &uri) == URI_PARSING_FAIL) exit(1);
-        printf("scheme: "); print_StringView(uri.scheme);
-        printf("userinfo: "); print_StringView(uri.userinfo);
-        printf("host: "); print_StringView(uri.host);
-        printf("port: "); print_StringView(uri.port);
-        printf("path: "); print_StringView(uri.path);
-        printf("query: "); print_StringView(uri.query);
-        printf("fragment: "); print_StringView(uri.fragment);
-    }
-    printf("==============================\n");
-    const char* rel_uri_strings[] =
-        {   "/a/b/c/d/index.html?rwf=22#end_end",
-            "",
-            "///home/user/file.txt",
-            "//blah@www.exmple.com:443/ewgrw/bewg/index.html?q=64;rhef#test"
-        };
-    for (int i = 0; i < sizeof(rel_uri_strings) / sizeof(rel_uri_strings[0]); ++i) {
-        const char* cstr = rel_uri_strings[i];
-        URI uri;
-        if (parse_relative_ref(cstr, &uri) == URI_PARSING_FAIL) exit(1);
-        printf("scheme: "); print_StringView(uri.scheme);
-        printf("userinfo: "); print_StringView(uri.userinfo);
-        printf("host: "); print_StringView(uri.host);
-        printf("port: "); print_StringView(uri.port);
-        printf("path: "); print_StringView(uri.path);
-        printf("query: "); print_StringView(uri.query);
-        printf("fragment: "); print_StringView(uri.fragment);
-    }
-    return 0;
 }
 
